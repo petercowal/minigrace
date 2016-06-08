@@ -112,16 +112,14 @@ function startup() {
   editor.commands.bindKeys({"ctrl-l":null, "ctrl-shift-r":null, "ctrl-r":null, "ctrl-t":null})
 
   document.getElementById('code_txt_real').style.height = (document.getElementById('stdout_txt').clientHeight
-                                                              + document.getElementById('tabbox').clientHeight) + 'px';
-
-  document.getElementById('code_txt_real').style.width = (document.getElementById('stdout_txt').clientWidth - 30) + 'px';
+                                                              + document.getElementById('stdout_options').clientHeight) + 'px';
+  document.getElementById('code_txt_real').style.width = (document.getElementById('stdout_txt').clientWidth - 10) + 'px';
 
   // resize ace on window resize
   window.onresize = function(event) {
-
       document.getElementById('code_txt_real').style.height = (document.getElementById('stdout_txt').clientHeight
-                                                                  + document.getElementById('tabbox').clientHeight) + 'px';
-      document.getElementById('code_txt_real').style.width = (document.getElementById('stdout_txt').clientWidth - 30) + 'px';
+                                                                  + document.getElementById('stdout_options').clientHeight) + 'px';
+      document.getElementById('code_txt_real').style.width = (document.getElementById('stdout_txt').clientWidth - 10) + 'px';
   }
 
   // Get code from ace editor.
