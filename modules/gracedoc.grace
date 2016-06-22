@@ -998,11 +998,11 @@ iframe {
       var a := anc
       var s := ""
       while { a.isEmpty.not } do {
-          if ("method" == a.parent.kind) then {
-              return s
-          }
-          elseif ("defdec" == a.parent.kind) then {
+          if ("defdec" == a.parent.kind) then {
               s := (a.parent.nameString ++ "." ++ s)
+          }
+          elseif ("object" != a.parent.kind) then {
+              return s
           }
           a := a.forebears
       }
@@ -1140,7 +1140,7 @@ iframe {
                     methodsSection.addElement(buildDefChain(anc) ++ n)withText(t)
                 }
             }
-            return true
+            return anc.parent.isObject
         } else {
             if (!settings.publicOnly) then {
                 def n = buildDefChain(anc) ++ o.name.value
@@ -1179,7 +1179,7 @@ iframe {
                     methodsSection.addElement(buildDefChain(anc) ++ n)withText(t)
                 }
             }
-            return true
+            return anc.parent.isObject
         }
     }
 
