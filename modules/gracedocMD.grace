@@ -112,6 +112,180 @@ class section.withTemplate(html')andCursorAt(idx) -> Section {
     }
 }
 
+<<<<<<< HEAD
+=======
+
+//Class for other sections without a template
+class emptySection.withCursorAt(idx) -> Section {
+    var md:String is readable := ""
+    var hasContent is readable := false
+    var cursor:Number is confidential := idx
+    var elts is public := dictionary []
+    method addElement(n:String)withText(t:String) {
+        hasContent := true
+        elts.at(n)put(t)
+    }
+    method insert(t:String) {
+        hasContent := true
+        def begin = md.substringFrom(1)to(cursor)
+        def end = md.substringFrom(cursor+1)to(md.size)
+        md := "{begin}{t}{end}"
+        cursor := cursor + t.size
+    }
+    method alphabetize {
+        var alpha := elts.keys.sorted
+        var numElts := 0
+        for (alpha) do { k ->
+            var rowClass
+            if ((numElts % 2) == 0)
+                then { rowClass := "row-even" }
+                else { rowClass := "row-odd" }
+            elts.at(k)put(elts.at(k).replace("class='placeholder'")
+                                        with("class='{rowClass}'"))
+            insert(elts.at(k))
+            numElts := numElts + 1
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+
+//Parameter class
+class Parameter{
+     var name:String is public := ""
+     var args:String is public := ""
+
+     method insertName(text:String){name := name ++ text}
+     method insertArg(text:String){args := args ++ text}
+}
+
+
+//Type to hold the properties of methods or
+// other parts of objects
+class Property{
+     var name:String is public := ""
+     var params: Set<Parameter> is readable := set [] //Set of parameters
+     var comments:String is public := ""
+
+     method addParam(param:Parameter) {params.add(param)}
+}
+
+method visitMethodType(o) -> Boolean {
+    if (isOnTypePage) then {
+
+       for (o.signature) do { part ->
+            temp.insertName(part.name ++ " `")
+            if (part.params.size > 0) then {
+                temp := t ++ "`("
+                for (part.params) do { param ->
+                    if (param.dtype != false) then {
+                        t := t ++ "" ++ param.nameString
+                        t := t ++ ":` "
+                        if (param.dtype.kind == "identifier") then {
+                            t := t ++ getTypeLink(param.dtype.value)
+                        } elseif (param.dtype.kind == "generic") then {
+                            t := t ++ getTypeLink(param.dtype.value.value)
+                            param.dtype.args.do { each -> t := "{t}{getTypeLink(each.value)}" } separatedBy { t := t ++ ", " }
+                        }
+                    } else {
+                        t := t ++ param.nameString ++ "  "
+                    }
+                    if ((part.params.size > 1) && (param != part.params.last)) then {
+                        t := t ++ "`, "
+                    }
+                }
+                t := t ++ "`)`"
+            }
+            //here...
+            t := t ++ "  "
+       }
+       t := t ++ "`—>` "
+
+       if (o.rtype != false) then {
+            if (o.rtype.kind == "identifier") then {
+                t := t ++ getTypeLink(o.rtype.value)
+            } elseif (o.rtype.kind == "generic") then {
+                t := t ++ getTypeLink(o.rtype.value.value) ++ "`"
+                o.rtype.args.do { each -> t := "{t}{getTypeLink(each.value)}  " } separatedBy { t := t ++ ", " }
+                t := t ++ "`"
+            }
+       } else {
+            t := t ++ "`Done`"
+       }
+       //Two spaces for markdown newline added here!
+       t := t ++ "  \n"
+       t := t ++ (formatComments(o) rowClass "description" colspan 2)
+       methodtypesSection.addElement(n)withText(t)
+       return false
+  
+//Class for a markdown writer object
+class markdownWriter
+{
+     var definition: String is readable := ""
+     var description: String is readable := ""
+     var propSet: Set<Property> is readable := set [] //Set of propeties
+     var bin: String is readable := ""
+
+     //Method to add text to definition
+     method insertDef(text:String)
+     {
+          definition := definition ++ text
+          print "\n\n Inserted to definition"
+     }
+
+     //Method to add text to description
+     method insertDesc(text:String)
+     {
+          description := description ++ text
+          print "\n\n Inserted to description"
+     }
+
+     //Adds a propety to the set contained in this obj
+     method addProp(title:String)withDesc(desc:String)
+     {
+          //Create the property
+          var newProp := Property
+
+          //Set the values
+          newProp.title := title;
+          newProp.description := desc;
+
+          //Add it to the set
+          propSet.add(newProp);
+
+          print "added prop"
+     }
+
+     //Add to the non-structured bin variable
+     method add(string:String)
+     {
+          bin := bin ++ string
+          print (bin)
+     }
+
+
+     //Write out all of the markdown to a string,
+     //formatted correctly
+     method buildMarkdown -> String
+     {
+          var temp := "### Definition \n"
+          temp := temp ++ definition
+          temp := temp ++ "\n\n### Description\n"
+          temp := temp ++ description
+
+          print (temp)
+          return temp
+
+     }
+
+     //Dumps the current bin variable
+     method dumpBin -> String { return bin }
+}
+
+
+
+
+>>>>>>> Update 2
 method trim(c:String) -> String {
     var start := 1
     var end := c.size
