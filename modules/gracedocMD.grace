@@ -113,7 +113,6 @@ class section.withTemplate(md')andCursorAt(idx) -> Section {
     }
 }
 
-
 //Class for other sections without a template
 class emptySection.withCursorAt(idx) -> Section {
     var md:String is readable := ""
@@ -216,7 +215,7 @@ method visitMethodType(o) -> Boolean {
        t := t ++ (formatComments(o) rowClass "description" colspan 2)
        methodtypesSection.addElement(n)withText(t)
        return false
-  
+
 //Class for a markdown writer object
 class markdownWriter
 {
@@ -280,8 +279,6 @@ class markdownWriter
      //Dumps the current bin variable
      method dumpBin -> String { return bin }
 }
-
-
 
 
 method trim(c:String) -> String {
@@ -496,44 +493,46 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         out := out ++ ")"
         return out
     }
-
+    method getClassLink(c:String)show(rep:String){
+      def filename = "{c}.html"
+      var out := "<a href='"
+      //first, check current module's class directory for filename
+      if (io.exists("{settings.outputdir}/{outdir}/classes/{filename}")) then {
+          if (isOnClassPage) then {
+              out := out ++ "{filename}"
+          } elseif (isOnTypePage) then {
+              out := out ++ "../classes/{filename}"
+          } else {
+              out := out ++ "classes/{filename}"
+          }
+      //if not found, check imported module directories
+      } elseif (io.exists("{settings.outputdir}/imported/classes/{filename}")) then {
+          if (isOnTypePage || isOnClassPage) then {
+              out := out ++ "../../imported/classes/{filename}"
+          } else {
+              out := out ++ "../imported/classes/{filename}"
+          }
+      //if not found, check gracelib classes
+      } elseif (io.exists("{settings.outputdir}/gracelib/classes/{filename}")) then {
+          if (isOnTypePage || isOnClassPage) then {
+              out := out ++ "../../gracelib/classes/{filename}"
+          } else {
+              out := out ++ "../gracelib/classes/{filename}"
+          }
+      } else {
+          var dots := ""
+          if (isOnClassPage || isOnTypePage) then {
+              dots := "../../"
+          } else {
+              dots := "../"
+          }
+          out := out ++ "{dots}404.html"
+      }
+      out := out ++ "'>{rep}</a>"
+      return out
+    }
     method getClassLink(c:String) is confidential {
-        def filename = "{c}.md"
-        var out := "[`{c}`]("
-        //first, check current module's class directory for filename
-        if (io.exists("{settings.outputdir}/{outdir}/classes/{filename}")) then {
-            if (isOnClassPage) then {
-                out := out ++ "{filename}"
-            } elseif (isOnTypePage) then {
-                out := out ++ "../classes/{filename}"
-            } else {
-                out := out ++ "classes/{filename}"
-            }
-        //if not found, check imported module directories
-        } elseif (io.exists("{settings.outputdir}/imported/classes/{filename}")) then {
-            if (isOnTypePage || isOnClassPage) then {
-                out := out ++ "../../imported/classes/{filename}"
-            } else {
-                out := out ++ "../imported/classes/{filename}"
-            }
-        //if not found, check gracelib classes
-        } elseif (io.exists("{settings.outputdir}/gracelib/classes/{filename}")) then {
-            if (isOnTypePage || isOnClassPage) then {
-                out := out ++ "../../gracelib/classes/{filename}"
-            } else {
-                out := out ++ "../gracelib/classes/{filename}"
-            }
-        } else {
-            var dots := ""
-            if (isOnClassPage || isOnTypePage) then {
-                dots := "../../"
-            } else {
-                dots := "../"
-            }
-            out := out ++ "{dots}404.md"
-        }
-        out := out ++ ")"
-        return out
+        getClassLink(c)show(c)
     }
 
     method buildTemplate is confidential {
@@ -831,13 +830,11 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         }
     }
 
-    //CLASS VISITOR -- MAIN INFO ABOUT CLASS?????
-    //Compiles and writes out the main information about a type
-    method visitMethod(o) -> Boolean {
+    method visitMethod(o)up(anc) -> Boolean {
 
         if (settings.publicOnly && o.isConfidential) then { return false }
         if (o.isClass) then {
-            return doClassMethod(o)
+            return doClassMethod(o)up(anc)
         }
         var t := "### Definition \n"
         var n := ""
@@ -878,22 +875,32 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         }
         t := t ++ "\n "
         t := t ++ formatComments(o) rowClass "description" colspan 2
-        methodsSection.addElement(n)withText(t)
+        methodsSection.addElement(buildDefChain(anc) ++ n)withText(t)
         return false
     }
-
-
-    // individual class methods ????
-    method doClassMethod(m) -> Boolean {
+    method buildDefChain(anc) -> String {
+      var a := anc
+      var s := ""
+      while { a.isEmpty.not } do {
+          if ("defdec" == a.parent.kind) then {
+              s := (a.parent.nameString ++ "." ++ s)
+          }
+          elseif ("object" != a.parent.kind) then {
+              return s
+          }
+          a := a.forebears
+      }
+      return s
+    }
+    method doClassMethod(m)up(anc) -> Boolean {
         def o = m.body.last
 
         if (isOnClassPage == false) then {
             var t := "<tr class='placeholder'>"
             def n = m.nameString
-            t := t ++ "<td><code><span class='class-name'>{getClassLink(n)}</span>"
-            t := t ++ "."
+            t := t ++ "<td><code><span class='ancestor-name'>{buildDefChain(anc)}</span>"
             m.signature.do { part ->
-                t := t ++ "<span class='method-name'>{part.name}</span>"
+                t := t ++ "<span class='method-name'>{getClassLink(n)show(part.name)}</span>"
                 if (part.params.size > 0) then {
                     t := t ++ "("
                     for(part.params) do { param ->
@@ -931,7 +938,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
             o.accept(classVis)
             classVis.generate
             t := t ++ formatComments(o) rowClass "top-box-description" colspan 1
-            classesSection.addElement(n) withText(t)
+            classesSection.addElement(buildDefChain(anc) ++ n) withText(t)
             return false
           } else {
             var t := "<span class='headline'><code><b>{o.name}</b>."
@@ -973,12 +980,16 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         }
     }
 
-    method visitDefDec(o) -> Boolean {
+    method visitDefDec(o)up(anc) -> Boolean {
         if (isOnClassPage == true) then {
             if (!settings.publicOnly) then {
                 def n = o.name.value
-                var t := "<tr class='placeholder'><td><code>def</code></td><td class='identifier-name'>{o.name.value}"
+
+
+                var t := "<tr class='placeholder'><td><code>def</code></td>"
+                t := t ++ "<td class='identifier-name'>{buildDefChain(anc) ++ n}"
                 t := t ++ "</td><td><code>"
+
                 if (o.dtype != false) then {
                     if (o.dtype.kind == "identifier") then {
                         t := t ++ getTypeLink(o.dtype.value)
@@ -990,14 +1001,14 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                 }
                 t := t ++ "</code></td></tr>"
                 t := t ++ formatComments(o) rowClass "description" colspan 3
-                fieldsSection.addElement(n) withText(t)
+                fieldsSection.addElement(buildDefChain(anc) ++ n) withText(t)
 
             } else {
                 //in publicOnly mode, readable defs should show up as getter methods
                 if (o.isReadable) then {
                     //FIXME: if isOnTypePage, then ???
                     def n = o.name.value
-                    var t := "<tr class='placeholder'><td class='identifier-name'>{o.name.value}"
+                    var t := "<tr class='placeholder'><td class='identifier-name'>{buildDefChain(anc) ++ n}"
                     t := t ++ "</td><td><code>"
                     if (o.dtype != false) then {
                         if (o.dtype.kind == "identifier") then {
@@ -1010,14 +1021,14 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                     }
                     t := t ++ "</code></td></tr>"
                     t := t ++ formatComments(o) rowClass "description" colspan 2
-                    methodsSection.addElement(n)withText(t)
+                    methodsSection.addElement(buildDefChain(anc) ++ n)withText(t)
                 }
             }
-            return false
+            return anc.parent.isObject
         } else {
             if (!settings.publicOnly) then {
-                def n = o.name.value
-                var t := "<tr class='placeholder'><td><code>def</code></td><td class='identifier-name'>{o.name.value}"
+                def n = buildDefChain(anc) ++ o.name.value
+                var t := "<tr class='placeholder'><td><code>def</code></td><td class='identifier-name'>{n}"
                 t := t ++ "</td><td><code>"
                 if (o.dtype != false) then {
                     if (o.dtype.kind == "identifier") then {
@@ -1035,7 +1046,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
             } else {
                 //in publicOnly mode, readable defs should show up as getter methods
                 if (o.isReadable) then {
-                    var t := "<tr class='placeholder'><td class='identifier-name'>{o.name.value}"
+                    var t := "<tr class='placeholder'><td class='identifier-name'>{buildDefChain(anc) ++ o.name.value}"
                     def n = o.name.value
                     t := t ++ "</td><td><code>"
                     if (o.dtype != false) then {
@@ -1049,18 +1060,18 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                     }
                     t := t ++ "</code></td></tr>"
                     t := t ++ formatComments(o) rowClass "description" colspan 2
-                    methodsSection.addElement(n)withText(t)
+                    methodsSection.addElement(buildDefChain(anc) ++ n)withText(t)
                 }
             }
-            return false
+            return anc.parent.isObject
         }
     }
 
-    method visitVarDec(o) -> Boolean {
-        def n = o.nameString
+    method visitVarDec(o)up(anc) -> Boolean {
+        def n = buildDefChain(anc) ++ o.nameString
         if (isOnClassPage == true) then {
             if (!settings.publicOnly) then {
-                var t := "<tr class='placeholder'><td><code>var</code></td><td class='identifier-name'>{o.name.value}"
+                var t := "<tr class='placeholder'><td><code>var</code></td><td class='identifier-name'>{buildDefChain(anc) ++ o.name.value}"
                 t := t ++ "</td><td><code>"
                 if (o.dtype != false) then {
                     t := t ++ "{getTypeLink(o.dtype.value)}"
@@ -1070,7 +1081,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                 fieldsSection.addElement(n)withText(t)
             } else {
                 if (o.isReadable) then {
-                    var t := "<tr class='placeholder'><td class='identifier-name'>{o.name.value}"
+                    var t := "<tr class='placeholder'><td class='identifier-name'>{buildDefChain(anc) ++ o.name.value}"
                     t := t ++ "</td><td>"
                     if (o.dtype != false) then {
                         t := t ++ "{getTypeLink(o.dtype.value)}"
@@ -1080,7 +1091,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                     methodsSection.addElement(n)withText(t)
                 }
                 if (o.isWritable) then {
-                    var t := "<tr class='placeholder'><td><code><span class='method-name'>{o.name.value}:=</span>"
+                    var t := "<tr class='placeholder'><td><code><span class='method-name'>{buildDefChain(anc) ++ o.name.value}:=</span>"
                     if (o.dtype != false) then {
                         t := t ++ "(_:{getTypeLink(o.dtype.value)})"
                     }
@@ -1092,7 +1103,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
             return false
         } else {
             if (!settings.publicOnly) then {
-                var t := "<tr class='placeholder'><td><code>var</code></td><td class='identifier-name'>{o.name.value}"
+                var t := "<tr class='placeholder'><td><code>var</code></td><td class='identifier-name'>{buildDefChain(anc) ++ o.name.value}"
                 t := t ++ "</td><td><code>"
                 if (o.dtype != false) then {
                     t := t ++ "{getTypeLink(o.dtype.value)}"
@@ -1102,7 +1113,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                 fieldsSection.addElement(n)withText(t)
             } else {
                 if (o.isReadable) then {
-                    var t := "<tr class='placeholder'><td class='identifier-name'>{o.name.value}"
+                    var t := "<tr class='placeholder'><td class='identifier-name'>{buildDefChain(anc) ++ o.name.value}"
                     t := t ++ "</td><td><code>"
                     if (o.dtype != false) then {
                         t := t ++ "{getTypeLink(o.dtype.value)}"
