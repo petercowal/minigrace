@@ -12,6 +12,14 @@ def settings = object {
     def version:Number is public = 1.1
 }
 
+//Markdown styling codewords
+def code = "code"
+def plain = "plaintext"
+def heading = "heading"
+def bold = "bold"
+def italic = "italic"
+
+
 method parseArguments {
     def args = sys.argv
     if (args.size > 1) then {
@@ -168,54 +176,6 @@ class Property{
      method addParam(param:Parameter) {params.add(param)}
 }
 
-method visitMethodType(o) -> Boolean {
-    if (isOnTypePage) then {
-
-       for (o.signature) do { part ->
-            temp.insertName(part.name ++ " `")
-            if (part.params.size > 0) then {
-                temp := t ++ "`("
-                for (part.params) do { param ->
-                    if (param.dtype != false) then {
-                        t := t ++ "" ++ param.nameString
-                        t := t ++ ":` "
-                        if (param.dtype.kind == "identifier") then {
-                            t := t ++ getTypeLink(param.dtype.value)
-                        } elseif (param.dtype.kind == "generic") then {
-                            t := t ++ getTypeLink(param.dtype.value.value)
-                            param.dtype.args.do { each -> t := "{t}{getTypeLink(each.value)}" } separatedBy { t := t ++ ", " }
-                        }
-                    } else {
-                        t := t ++ param.nameString ++ "  "
-                    }
-                    if ((part.params.size > 1) && (param != part.params.last)) then {
-                        t := t ++ "`, "
-                    }
-                }
-                t := t ++ "`)`"
-            }
-            //here...
-            t := t ++ "  "
-       }
-       t := t ++ "`—>` "
-
-       if (o.rtype != false) then {
-            if (o.rtype.kind == "identifier") then {
-                t := t ++ getTypeLink(o.rtype.value)
-            } elseif (o.rtype.kind == "generic") then {
-                t := t ++ getTypeLink(o.rtype.value.value) ++ "`"
-                o.rtype.args.do { each -> t := "{t}{getTypeLink(each.value)}  " } separatedBy { t := t ++ ", " }
-                t := t ++ "`"
-            }
-       } else {
-            t := t ++ "`Done`"
-       }
-       //Two spaces for markdown newline added here!
-       t := t ++ "  \n"
-       t := t ++ (formatComments(o) rowClass "description" colspan 2)
-       methodtypesSection.addElement(n)withText(t)
-       return false
-
 //Class for a markdown writer object
 class markdownWriter
 {
@@ -223,6 +183,7 @@ class markdownWriter
      var description: String is readable := ""
      var propSet: Set<Property> is readable := set [] //Set of propeties
      var bin: String is readable := ""
+     var currentMode: String := "plaintext"
 
      //Method to add text to definition
      method insertDef(text:String)
@@ -239,13 +200,13 @@ class markdownWriter
      }
 
      //Adds a propety to the set contained in this obj
-     method addProp(title:String)withDesc(desc:String)
+     method addProp(aTitle:String)withDesc(desc:String)
      {
           //Create the property
           var newProp := Property
 
           //Set the values
-          newProp.title := title;
+          newProp.title := aTitle;
           newProp.description := desc;
 
           //Add it to the set
@@ -253,14 +214,65 @@ class markdownWriter
 
           print "added prop"
      }
+////////////////////////////////////////////////////////
 
-     //Add to the non-structured bin variable
-     method add(string:String)
+     //For encapsulating code
+     method changeMode(newMode:String)
      {
-          bin := bin ++ string
-          print (bin)
+          //Change to code writing
+          if((newMode == code) && (currentMode == plain)) then {bin := bin ++ "`";  print "\nChanged to code"}
+          if((newMode == code) && (currentMode == heading)) then {bin := bin ++ "`";  print "\nChanged to code"}
+
+          //Change to plain writing
+          if((newMode == plain) && (currentMode == code)) then {bin := bin ++ "`";  print "\nChanged to plain"}
+          //No styling change needed from heading
+
+          //Change to heading writing
+          if((newMode == heading) && (currentMode == code)) then {bin := bin ++ "`";  print "\nChanged to heading"}
+          if(newMode == heading) then { bin := bin ++ "\n\n### " }
+          //No styling change required from plain formatting
+
+          //Set current mode to new mode
+          currentMode := newMode;
      }
 
+     //Add text -- ignore mode
+     method addText(string:String)
+     {
+          bin := bin ++ string
+     }
+
+     //Add to the non-structured bin variable
+     method addText(string:String)inMode(mode:String)
+     {
+          //Change formatting mode if needed
+          changeMode(mode)
+
+          bin := bin ++ string
+
+          //If title was added -- put a couple newlines after it
+          if(mode == heading) then {bin := bin ++ "\n\n"}
+     }
+
+     method addCode(string:String)
+     {
+          bin := bin ++ "`" ++ string ++ "`"
+     }
+
+     method addLink(string:String)
+     {
+          bin := bin ++ string
+     }
+
+     method addHeader(string:String)
+     {
+          bin := bin ++ string
+     }
+
+     method add(string:String) {bin := bin ++ string}
+
+     method addSpace{bin := bin ++ " "}
+     method addNewline{bin := bin ++ "\n"}
 
      //Write out all of the markdown to a string,
      //formatted correctly
@@ -684,11 +696,12 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
     //NOTE: Called for every method as an individual function call
     method visitMethodType(o) -> Boolean {
         if (isOnTypePage) then {
-            var temp := ""
+            var t := ""
+            var n := ""
             for (o.signature) do { part ->
-                temp := temp ++ part.name ++ " `"
+                t := t ++ part.name ++ " `"
                 if (part.params.size > 0) then {
-                    temp := t ++ "`("
+                    t := t ++ "`("
                     for (part.params) do { param ->
                         if (param.dtype != false) then {
                             t := t ++ "" ++ param.nameString
@@ -737,32 +750,36 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
     //TYPE VISITOR -- MAIN INFO ABOUT TYPE
     //Compiles and writes out the main information about a type
     method visitTypeDec(o) -> Boolean {
+         //Does not appear that this if statement is ever entered...
         if (isOnTypePage == false) then {
             def n = o.nameString
-            writer.insertDef("`{getTypeLink(o.name.value)} ->`")
+            writer.addText("Definition")inMode(heading)
+            writer.addText("{getTypeLink(o.name.value)} ->")inMode(code)
             if (false != o.typeParams) then {
-                writer.insertDef(" `")
                 for (o.typeParams.params) do { g ->
                     writer.add(g.nameString)
-                    if (g != o.typeParams.params.last) then { writer.insertDef(", ")}
+                    if (g != o.typeParams.params.last) then { writer.addText(", ")inMode(code)}
                 }
             }
 
             def typeVis = graceDocVisitor.createFrom("{o.name.value}")outTo("{outdir}")as("type")
             o.accept(typeVis)
             typeVis.generate
-            writer.insertDesc(formatComments(o) rowClass "description" colspan 1)
-            typesSection.addElement(n)withText(writer.buildMarkdown)
+            writer.addText(formatComments(o) rowClass "description" colspan 1)inMode(plain)
+            typesSection.addElement(n)withText(writer.dumpBin)
             return false
+
+        //Actual writing for types happens here
         } else {
-            writer.add("`{o.name.value} ->`")
+            writer.addText("Definition")inMode(heading)
+            writer.addText("{o.name.value} ->")inMode(code)
             if (false != o.typeParams) then {
                 for (o.typeParams.params) do { g->
-                    writer.add(g.nameString)
-                    if (g != o.typeParams.params.last) then {writer.add(", ")}
+                    writer.addText(g.nameString)inMode(code)
+                    if (g != o.typeParams.params.last) then {writer.addText(", ")inMode(code)}
                 }
             }
-            writer.add("  ")
+            writer.addSpace
             var temp := ""
             var ops := list []
             var tps := list []
@@ -785,46 +802,46 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                     node := node.left
                 }
 
+                //Add and reset temp
+                writer.addText(temp)inMode(plain) //Plain mode needed for linking
+                temp := ""
+
                 while {(tps.size > 0) && (ops.size > 0)} do {
                     def p = tps.pop
-                    temp := "{temp} `{ops.pop}` {getTypeLink(p.value)}"
+                    temp := "{temp} {ops.pop} {getTypeLink(p.value)}"
                 }
                 if (ops.size > 0) then {
-                    temp := "{temp} `{ops.pop}`"
+                    temp := "{temp} {ops.pop}"
                 }
 
-                temp := temp ++ "`type`"
-                writer.add(temp)
-                writer.add("`\{...added methods below...\}`")
+                temp := temp ++ "type"
+                writer.addText(temp)inMode(code)
+                writer.addText("\{...added methods below...\}")inMode(code)
             } elseif (node.kind == "typeliteral") then {
 
-                temp := temp ++ "`type`"
-                writer.add("`\{...added methods below...\}`")
+                temp := temp ++ "type"
+                writer.addText("\{...added methods below...\}")inMode(code)
             } elseif (node.kind == "identifier") then {
-                writer.add(" ")
-                writer.add(getTypeLink(node.value))
+                writer.addSpace
+                writer.addText(getTypeLink(node.value))inMode(plain)
                 if (node.generics != false) then {
-                    writer.add("`") //Add code formatting for this section
                     for (node.generics) do { g->
-                        writer.add(g.value)
+                        writer.addText(g.value)inMode(code)
                         if (g != node.generics.last) then { writer.add(", ") }
                     }
-                    writer.add("`")
                 }
             } elseif (node.kind == "member") then {
-                writer.add(getTypeLink("{node.in.value}.{node.value}"))
+                writer.addText(getTypeLink("{node.in.value}.{node.value}"))inMode(plain)
                 if (node.generics != false) then {
-                    writer.add("`") //Add code formatting for this section
                     for (node.generics) do { g->
-                        writer.add(g.value)
-                        if (g != node.generics.last) then {writer.add(", ")}
+                        writer.addText(g.value)inMode(code)
+                        if (g != node.generics.last) then {writer.addText(", ")inMode(code)}
                     }
-                    writer.add("`")
                 }
             }
-            writer.add("\n\n### Description\n")
-            writer.add(formatComments(o) rowClass "top-box-description" colspan 1)
-            writer.add("\n### Properties\n")
+            writer.addText("Description")inMode(heading)
+            writer.addText(formatComments(o) rowClass "top-box-description" colspan 1)inMode(plain)
+            writer.addText("Properties")inMode(heading)
             topDescSection.insert(writer.dumpBin)
             return true
         }
