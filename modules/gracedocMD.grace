@@ -18,6 +18,10 @@ def plain = "plaintext"
 def heading = "heading"
 def bold = "bold"
 def italic = "italic"
+def baseUrl = "/grace-documentation/" //NOTE: This must be changed for each different site
+                                        //    being built!
+def classList = "classList"
+def typeList = "typeList"
 
 
 method parseArguments {
@@ -177,6 +181,162 @@ class Property{
      method addParam(param:Parameter) {params.add(param)}
 }
 
+class sidebarModule{
+     var name is public := ""
+     var classFiles is public := ""
+     var typeFiles is public := ""
+}
+
+//Class to generate sidebar file...
+class sidebarFileGenerator
+{
+     var fileOut:String := "entries:\n- title: Sidebar\n  product: Grace Documentation\n  version: 1.0\n  folders:\n\n"
+     var folderIndent := 2
+     var fileIndent := 4
+     var classFiles:String := ""
+     var typeFiles:String := ""
+     var modSet := false
+     var inSubFolder := true
+     var contentExistsInFolder := false
+     var moduleList: dictionary<sidebarModule> := dictionary []
+
+
+     //Add to a specific list output
+     method add(string:String)toList(aList:String)inModule(modName:String)
+     {
+          var mod:sidebarModule
+
+          //Try to find the mod in the mooduleList first
+          if(moduleList.containsKey(modName))then{
+               mod := moduleList.at(modName)
+          } else {
+               //Create and name the mod
+               mod := sidebarModule
+               mod.name := modName
+
+               //Store the module in the dictionary
+               moduleList.at(modName)put(mod)
+               //print "\n\nADDED MOD: {mod.name} onbar: {modName}\n"
+          }
+
+          if(aList == classList) then
+          {
+               mod.classFiles := mod.classFiles ++ string
+               //classFiles := classFiles ++ string;
+          }
+          elseif(aList == typeList) then
+          {
+               mod.typeFiles := mod.typeFiles ++ string
+               //typeFiles := typeFiles ++ string;
+          }
+          else
+          {
+               fileOut := fileOut ++ string;
+          }
+     }
+
+     //Sets the module name and overarching sidebar
+     method setModule(name:String)
+     {
+          //Add the main folder for the module...
+          addFolder(name)
+
+          //Set mod flag to true
+          modSet := true
+     }
+
+     //Add to main output
+     method add(string:String)
+     {
+          fileOut := fileOut ++ string;
+     }
+
+     //Adds a folder to the sidebar
+     method addFolder(title:String)
+     {
+          add("\n")
+          add("  - title: \"{title}\"\n")
+          add("    output: web, pdf\n")
+          add("    folderitems:\n")
+
+          //Set the sub folder flag to track indent
+          inSubFolder := false
+          contentExistsInFolder := false
+     }
+
+     //Signals that sub-folders will follow
+     method signalSubfolders
+     {
+          //Check for content... if no content add a blank one
+          if(!contentExistsInFolder)  then {addFile("")withLink("404")toList("---")inModule("-none-")}
+
+          //Add the subforlder signal
+          add("      subfolders:\n")
+     }
+
+     //Adds a subfolder to the sidebar
+     method addSubFolder(title:String)
+     {
+          //Check if we are NOT in subfolder mode... then signal sub-folder start
+          if(!inSubFolder) then {signalSubfolders}
+
+          add("\n")
+          add("      - title: \"{title}\"\n")
+          add("        output: web, pdf\n")
+          add("        subfolderitems:\n")
+
+          //Set the sub folder flags to track indent
+          inSubFolder := true
+          contentExistsInFolder := false
+     }
+
+     //Adds a file to the sidebar
+     method addFile(title:String)withLink(link:String)toList(aList:String)inModule(modName:String)
+     {
+          if(inSubFolder) then
+          {
+               add("\n")toList(aList)inModule(modName)
+               add("        - title: \"{title}\"\n")toList(aList)inModule(modName)
+               add("          url: /{link}/\n")toList(aList)inModule(modName)
+               add("          output: web \n")toList(aList)inModule(modName)
+          }
+          else
+          {
+               add("\n")toList(aList)inModule(modName)
+               add("    - title: \"{title}\"\n")toList(aList)inModule(modName)
+               add("      url: /{link}/\n")toList(aList)inModule(modName)
+               add("      output: web \n")toList(aList)inModule(modName)
+          }
+
+          contentExistsInFolder := true
+     }
+
+     method generate(module:String)
+     {
+          print "\nGenerating Sidebar... "
+          if(!modSet) then { setModule("Main-1")}; //Just in case setModule was not already called,
+                                             // which it should have been
+
+          var mod:sidebarModule := moduleList.at(module)
+
+          //print "\n\nSidebar MOD NAME: {mod.name} onbar: {module}\n"
+
+          //Generate Sub-Folders and then add Files
+          addSubFolder("Classes")
+          fileOut := fileOut ++ mod.classFiles
+          //fileOut := fileOut ++ classFiles
+
+          addSubFolder("Types")
+          fileOut := fileOut ++ mod.typeFiles
+          //fileOut := fileOut ++ typeFiles
+
+          var out := io.open("{settings.outputdir}/grace-doc-sidebar.yml", "w")
+          out.write(fileOut)
+          out.close
+     }
+}
+
+
 //Class for a markdown writer object
 class markdownWriter
 {
@@ -184,7 +344,7 @@ class markdownWriter
      var description: String is readable := ""
      var propSet: Set<Property> is readable := set [] //Set of propeties
      var bin: String is readable := ""
-     var currentMode: String := "plaintext"
+     var currentMode: String := plain
 
      //Method to add text to definition
      method insertDef(text:String)
@@ -221,16 +381,16 @@ class markdownWriter
      method changeMode(newMode:String)
      {
           //Change to code writing
-          if((newMode == code) && (currentMode == plain)) then {bin := bin ++ "`";  print "\nChanged to code"}
-          if((newMode == code) && (currentMode == heading)) then {bin := bin ++ "`";  print "\nChanged to code"}
+          if((newMode == code) && (currentMode == plain)) then {bin := bin ++ "`"}
+          if((newMode == code) && (currentMode == heading)) then {bin := bin ++ "`"}
 
           //Change to plain writing
-          if((newMode == plain) && (currentMode == code)) then {bin := bin ++ "`";  print "\nChanged to plain"}
-          //No styling change needed from heading
+          if((newMode == plain) && (currentMode == code)) then {bin := bin ++ "`"}
+          //if((newMode == plain) && (currentMode == heading)) then {bin := bin ++ ""}
 
           //Change to heading writing
-          if((newMode == heading) && (currentMode == code)) then {bin := bin ++ "`";  print "\nChanged to heading"}
-          if(newMode == heading) then { bin := bin ++ "\n\n### " }
+          if((newMode == heading) && (currentMode == code)) then {bin := bin ++ "`\n"}
+          if(newMode == heading) then { bin := bin ++ "\n### " }
           //No styling change required from plain formatting
 
           //Set current mode to new mode
@@ -238,10 +398,7 @@ class markdownWriter
      }
 
      //Add text -- ignore mode
-     method addText(string:String)
-     {
-          bin := bin ++ string
-     }
+     method addText(string:String){ bin := bin ++ string }
 
      //Add to the non-structured bin variable
      method addText(string:String)inMode(mode:String)
@@ -251,8 +408,8 @@ class markdownWriter
 
           bin := bin ++ string
 
-          //If title was added -- put a couple newlines after it
-          if(mode == heading) then {bin := bin ++ "\n\n"}
+          //Add a newline after the heading -- hard to do correctly with changeMode call
+          if(mode == heading) then {bin := bin ++ "\n"}
      }
 
      method addCode(string:String)
@@ -267,13 +424,22 @@ class markdownWriter
 
      method addHeader(string:String)
      {
-          bin := bin ++ string
+          bin := bin ++ string ++ "\n"
      }
 
      method add(string:String) {bin := bin ++ string}
 
      method addSpace{bin := bin ++ " "}
-     method addNewline{bin := bin ++ "\n"}
+     method addColon{bin := bin ++ ":"}
+     method addComma{bin := bin ++ ","}
+     method addBullet{bin := bin ++ "- "}
+
+     //Newline is special, since we should reset the mode...
+     method addNewline
+     {
+          changeMode(plain)
+          bin := bin ++ "  \n"
+     }
 
      //Write out all of the markdown to a string,
      //formatted correctly
@@ -289,8 +455,14 @@ class markdownWriter
 
      }
 
-     //Dumps the current bin variable
-     method dumpBin -> String { return bin }
+     //Dumps the current bin variable and clears it
+     method dumpBin -> String
+     {
+          //Reset write mode to create a clean slate
+          currentMode := plain;
+          var temp := bin;
+          bin := "";
+          return temp }
 }
 
 
@@ -338,19 +510,23 @@ class directoryBuilderForFile(in) outTo (dir) as (pageType) {
         var outfile
         if (!io.exists("{settings.outputdir}")) then { io.system("mkdir {settings.outputdir}") }
         if (!io.exists("{settings.outputdir}/{outdir}")) then { io.system("mkdir {settings.outputdir}/{outdir}") }
-        if (!io.exists("{settings.outputdir}/{outdir}/classes")) then {
-            io.system("mkdir {settings.outputdir}/{outdir}/classes")
-        }
-        if (!io.exists("{settings.outputdir}/{outdir}/types")) then {
-            io.system("mkdir {settings.outputdir}/{outdir}/types")
-        }
-        if (isOnClassPage) then {
-            outfile := io.open("{settings.outputdir}/{outdir}/classes/{pageName}.md", "w")
-        } elseif (isOnTypePage) then {
-            outfile := io.open("{settings.outputdir}/{outdir}/types/{pageName}.md", "w")
-        } else {
-            outfile := io.open("{settings.outputdir}/{outdir}/{pageName}.md", "w")
-        }
+
+        //Old Types and Classes separate dirs
+        //if (!io.exists("{settings.outputdir}/{outdir}/classes")) then {
+          //  io.system("mkdir {settings.outputdir}/{outdir}/classes")
+        //}
+        //if (!io.exists("{settings.outputdir}/{outdir}/types")) then {
+          //  io.system("mkdir {settings.outputdir}/{outdir}/types")
+        //}
+        //if (isOnClassPage) then {
+     //       outfile := io.open("{settings.outputdir}/{outdir}/{pageName}.md", "w")
+       // } elseif (isOnTypePage) then {
+     //       outfile := io.open("{settings.outputdir}/{outdir}/{pageName}.md", "w")
+       // } else {
+          //  outfile := io.open("{settings.outputdir}/{outdir}/{pageName}.md", "w")
+     //   }
+
+        outfile := io.open("{settings.outputdir}/{outdir}/{pageName}.md", "w")
         outfile.write("TEMPORARY")
         outfile.close
 
@@ -449,63 +625,69 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
     def title = if (isOnTypePage) then { "Type: {pageName}" }
                 elseif (isOnClassPage) then { "Class: {pageName}" }
                 else { "Module: {pageName}" }
-    var headerSection
-    var methodsSection
-    var typesSection
-    var fieldsSection
-    var classesSection
+    var section1
+    var section2
+    var section3
+    var section4
+    var section5
     var footerSection
     var methodtypesSection
-    var topDescSection
+    var section6
     var writer := markdownWriter
 
-    //debugging
-    if (settings.verbosity > 1) then { print "On {title} - graceDocVisitor created... ({sys.elapsedTime})" }
-
     def outdir = if (isOnClassPage || isOnTypePage) then { dir } else { pageName }
+
+    //debugging
+    if (settings.verbosity > 1) then { print "On {title} - graceDocVisitor created... inMod {outdir} at time: ({sys.elapsedTime})" }
+
+    //Build the template
     buildTemplate
 
 
+    //LINKS ARE BUILT HERE !! (for both types and classes) MARKDOWN
+    //NOTE: If using a different website -- change the baseUrl variable def
 
-    // --1*Backlink
     //This method creates and returns the internal page link -- now in markdown
     method getTypeLink(v:String) is confidential {
-        def filename = "{v}.md"
-        var out := "[`{v}`]("
+        def filename = "{v}"
+        var out := "[`{v}`]("  //BASEURL defined at top of file  {baseUrl}
         //first, check current module's types directory for filename
-        if (io.exists("{settings.outputdir}/{outdir}/types/{filename}")) then {
-            if (isOnTypePage) then {
-                out := out ++ "{filename}"
-            } elseif (isOnClassPage) then {
-                out := out ++ "../types/{filename}"
-            } else {
-                out := out ++ "types/{filename}"
-            }
+        if (io.exists("{settings.outputdir}/{outdir}/{filename}.md")) then {
+             out := out ++ "{baseUrl}{filename}"
         //if not found, check imported module directories
-        } elseif (io.exists("{settings.outputdir}/imported/types/{filename}")) then {
-            if (isOnTypePage || isOnClassPage) then {
-                out := out ++ "../../imported/types/{filename}"
-            } else {
-                out := out ++ "../imported/types/{filename}"
-            }
+        } elseif (io.exists("{settings.outputdir}/imported/types/{filename}.md")) then {
+             out := out ++ "{baseUrl}{filename}"
         //if not found, check gracelib types
-        } elseif (io.exists("{settings.outputdir}/gracelib/types/{filename}")) then {
-            if (isOnTypePage || isOnClassPage) then {
-                out := out ++ "../../gracelib/types/{filename}"
-            } else {
-                out := out ++ "../gracelib/types/{filename}"
-            }
+        } elseif (io.exists("{settings.outputdir}/gracelib/types/{filename}.md")) then {
+            out := out ++ "{baseUrl}{filename}"
         } else {
-            var dots := ""
-            if (isOnClassPage || isOnTypePage) then {
-                dots := "../../"
-            } else {
-                dots := "../"
-            }
-            out := out ++ "{dots}404.md"
+            out := out ++ "{baseUrl}404"
+            //print "\nFile NOT FOUND!! --> below"
         }
+        //print "\nBaseURL: {baseUrl}\n FileName: {filename}.md"
         out := out ++ ")"
         return out
+    }
+
+    method getClassLink(c:String)show(rep:String){
+      def filename = "{c}"
+      var out := "[`{c}`]("
+      //first, check current module's class directory for filename
+      if (io.exists("{settings.outputdir}/{outdir}/{filename}.md")) then {
+           out := out ++ "{baseUrl}{filename}"
+      //if not found, check imported module directories
+      } elseif (io.exists("{settings.outputdir}/imported/classes/{filename}.md")) then {
+           out := out ++ "{baseUrl}{filename}"
+      //if not found, check gracelib classes
+      } elseif (io.exists("{settings.outputdir}/gracelib/classes/{filename}.md")) then {
+          out := out ++ "{baseUrl}{filename}"
+      } else {
+          out := out ++ "{baseUrl}404"
+          //print "\nFile NOT FOUND!! --> below"
+      }
+      //print "\nBaseURL: {baseUrl}\n FileName: {filename}.md"
+      out := out ++ ")"
+      return out
     }
 
     method getClassLink(c:String) is confidential {
@@ -552,6 +734,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         var out := "---\n"
         var classIndex := 0
         var typeIndex := 0
+        var localWriter := markdownWriter
 
         //Create the permalink for linking
         //need to filter out "Class:" and "Type: "
@@ -573,34 +756,101 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         out := out ++ "folder: grace-docs\n"
         out := out ++ "---\n"
 
+        //Add the file to the sidebar
+        if(title.contains("Class:"))then
+        {
+             sidebarGen.addFile(title)withLink(permalink)toList(classList)inModule(outdir)
+             print "\nadded {title} to {classList} in module {outdir}"
+        }
+        elseif(title.contains("Type:"))then
+        {
+             sidebarGen.addFile(title)withLink(permalink)toList(typeList)inModule(outdir)
+        }
+
+        //If on a class page, then also generate the page header itself...
+        if (isOnClassPage) then
+        {
+             localWriter.addText("Definition")inMode(heading)
+             localWriter.addText(title)inMode(plain)
+             localWriter.addNewline
+             localWriter.addText("Description")inMode(heading)
+             localWriter.addText("Not currently available...")inMode(plain)
+             localWriter.addNewline
+             localWriter.addText("Properties")inMode(heading)
+             localWriter.addNewline
+
+             //Add writer to output...
+             out := out ++ localWriter.dumpBin
+        }
+
+        //If it is a class overview page...
+        if (!isOnClassPage && !isOnTypePage) then
+        {
+             localWriter.addText("Methods")inMode(heading)
+             localWriter.addNewline
+
+             //Add writer to output...
+             out := out ++ localWriter.dumpBin
+        }
 
         ///////////////////////////////////////////////////////////////////
 
         //This line generates the header for the file. We dont need the commands below to
         //be initialized with a template since this program is generating markdown now, not HTML
-        headerSection := section.withTemplate(out)andCursorAt(cursor)
+        section1 := section.withTemplate(out)andCursorAt(cursor)
 
-        topDescSection := section.withTemplate("")andCursorAt(cursor)
-        fieldsSection := section.withTemplate("")andCursorAt(cursor)
+        section2 := section.withTemplate("")andCursorAt(cursor)
+
+        cursor := 0
+        writer.addText("Types")inMode(heading)
+        out := writer.dumpBin
+        cursor := out.size
+
+        section3 := section.withTemplate(out)andCursorAt(cursor)
+
+        cursor := 0
+        writer.addText("Definitions")inMode(heading)
+        out := writer.dumpBin
+        cursor := out.size
+        section4 := section.withTemplate(out)andCursorAt(cursor)
+
+        section5 := section.withTemplate("")andCursorAt(cursor)
+
+        section6 := section.withTemplate("")andCursorAt(cursor)
+
+
         methodtypesSection := section.withTemplate("")andCursorAt(cursor)
-        typesSection := section.withTemplate("")andCursorAt(cursor)
-        classesSection := section.withTemplate("")andCursorAt(cursor)
-        methodsSection := section.withTemplate("")andCursorAt(cursor)
+
         footerSection := section.withTemplate("")andCursorAt(cursor)
 
         ///////////////////////////////////////////////////////////////////
 
     }
 
+    //Only called once to build 404 page
     method build404 {
-        var out := "<!-- generated by Gracedoc, v{settings.version} -- https://github.com/reid47/gracedoc -->\n"
-        out := out ++ "<!DOCTYPE html>\n<html>"
-        out := out ++ "<head><title>404 - Page not found | GraceDocs</title></head>"
-        out := out ++ "<body><div id='message-404'>404 - Page not found</div></body>"
-        out := out ++ "</html>"
+        var out := "---\n"
+        out := out ++ "title: \"{title}\"\n"
+        out := out ++ "keywords: mydoc\n"
+        out := out ++ "sidebar: grace-doc-sidebar\n"
+        out := out ++ "toc: false\n"
+        out := out ++ "permalink: /404/\n"
+        out := out ++ "folder: grace-docs\n"
+        out := out ++ "---\n"
+
+        out := out ++ "# 404 - Page 'ot Found  "
+        out := out ++ "\n  \n  \nOops! The file for this link appears to be missing! \n"
+        out := out ++ "Please naviagte back to your previous page!\"\n"
+
         var file404 := io.open("{settings.outputdir}/404.md", "w")
         file404.write(out)
         file404.close
+    }
+
+    //Sets the module name of the sidebar - allowing all pages to be contained in a div
+    method setSidebarName
+    {
+         sidebarGen.setModule(outdir)
     }
 
     method buildindex {
@@ -647,42 +897,36 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
 
         var outfile
         var output := ""
-        if (isOnClassPage) then {
-            outfile := io.open("{settings.outputdir}/{outdir}/classes/{pageName}.md", "w")
-        } elseif (isOnTypePage) then {
-            outfile := io.open("{settings.outputdir}/{outdir}/types/{pageName}.md", "w")
-        } else {
-            outfile := io.open("{settings.outputdir}/{outdir}/{pageName}.md", "w")
-        }
+        outfile := io.open("{settings.outputdir}/{outdir}/{pageName}.md", "w")
 
         //////////////////////////////////
         // Replace this with our object
         //////////////////////////////////
 
 
-        output := output ++ headerSection.md
-        if (topDescSection.hasContent) then {
-            output := output ++ topDescSection.md
+        output := output ++ section1.md
+        if (section6.hasContent) then {
+            output := output ++ section6.md
         }
-        if (fieldsSection.hasContent) then {
-            fieldsSection.alphabetize
-            output := output ++ fieldsSection.md
+        if (section4.hasContent) then {
+            section4.alphabetize
+            output := output ++ section4.md
         }
         if (methodtypesSection.hasContent) then {
             methodtypesSection.alphabetize
             output := output ++ methodtypesSection.md
         }
-        if (typesSection.hasContent) then {
-            typesSection.alphabetize
-            output := output ++ typesSection.md
+        if (section3.hasContent) then {
+            section3.alphabetize
+            output := output ++ section3.md
         }
-        if (classesSection.hasContent) then {
-            classesSection.alphabetize
-            output := output ++ classesSection.md
+        if (section5.hasContent) then {
+            section5.alphabetize
+            output := output ++ section5.md
         }
-        if (methodsSection.hasContent) then {
-            methodsSection.alphabetize
-            output := output ++ methodsSection.md
+        if (section2.hasContent) then {
+            section2.alphabetize
+            output := output ++ section2.md
         }
         output := output ++ footerSection.md
         outfile.write(output)
@@ -696,51 +940,51 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
     //NOTE: Called for every method as an individual function call
     method visitMethodType(o) -> Boolean {
         if (isOnTypePage) then {
-            var t := ""
-            var n := ""
+            writer.addBullet
             for (o.signature) do { part ->
-                t := t ++ part.name ++ " `"
+                writer.addText(part.name)inMode(code)
                 if (part.params.size > 0) then {
-                    t := t ++ "`("
+                    writer.addText("(")inMode(code)
                     for (part.params) do { param ->
                         if (param.dtype != false) then {
-                            t := t ++ "" ++ param.nameString
-                            t := t ++ ":` "
+                            writer.addText(param.nameString)inMode(code)
+                            writer.addColon
                             if (param.dtype.kind == "identifier") then {
-                                t := t ++ getTypeLink(param.dtype.value)
+                                writer.addText(getTypeLink(param.dtype.value))inMode(plain)
                             } elseif (param.dtype.kind == "generic") then {
-                                t := t ++ getTypeLink(param.dtype.value.value)
-                                param.dtype.args.do { each -> t := "{t}{getTypeLink(each.value)}" } separatedBy { t := t ++ ", " }
+                                writer.addText(param.dtype.value.value)inMode(plain)
+                                param.dtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(code)} separatedBy { writer.addComma }
                             }
                         } else {
-                            t := t ++ param.nameString ++ "  "
+                            writer.addText(param.nameString)inMode(code)
                         }
                         if ((part.params.size > 1) && (param != part.params.last)) then {
-                            t := t ++ "`, "
+                            writer.addComma
                         }
                     }
-                    t := t ++ "`)`"
+                    writer.addText(")")inMode(code)
                 }
                 //here...
-                t := t ++ "  "
+                writer.addSpace
             }
-            t := t ++ "`—>` "
+            writer.addText("—> ")inMode(code)
 
             if (o.rtype != false) then {
                 if (o.rtype.kind == "identifier") then {
-                    t := t ++ getTypeLink(o.rtype.value)
+                    writer.addText(getTypeLink(o.rtype.value))inMode(plain)
                 } elseif (o.rtype.kind == "generic") then {
-                    t := t ++ getTypeLink(o.rtype.value.value) ++ "`"
-                    o.rtype.args.do { each -> t := "{t}{getTypeLink(each.value)}  " } separatedBy { t := t ++ ", " }
-                    t := t ++ "`"
+                    writer.addText(getTypeLink(o.rtype.value.value))inMode(plain)
+                    o.rtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(code) } separatedBy { writer.addComma}
                 }
             } else {
-                t := t ++ "`Done`"
+                writer.addText("Done")inMode(code)
             }
             //Two spaces for markdown newline added here!
-            t := t ++ "  \n"
-            t := t ++ (formatComments(o) rowClass "description" colspan 2)
-            methodtypesSection.addElement(n)withText(t)
+            writer.addText("  \n")inMode(plain)
+            writer.addText(formatComments(o) rowClass "description" colspan 2)inMode(plain)
+            writer.addNewline
+            //methodtypesSection.addElement(n)withText(t)
+            section6.insert(writer.dumpBin)
             return false
         } else {
             return true
@@ -750,23 +994,32 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
     //TYPE VISITOR -- MAIN INFO ABOUT TYPE
     //Compiles and writes out the main information about a type
     method visitTypeDec(o) -> Boolean {
-         //Does not appear that this if statement is ever entered...
+
+         //Code is executed if we are on the main page for a class
+         //Lists all of the TYPES in the class
         if (isOnTypePage == false) then {
             def n = o.nameString
-            writer.addText("Definition")inMode(heading)
-            writer.addText("{getTypeLink(o.name.value)} ->")inMode(code)
+            //writer.addText("Definition--1")inMode(heading)
+            writer.addBullet
+            writer.addText("{getTypeLink(o.name.value)}")inMode(plain)
             if (false != o.typeParams) then {
+                writer.addText(" -> ")inMode(code)
                 for (o.typeParams.params) do { g ->
-                    writer.add(g.nameString)
-                    if (g != o.typeParams.params.last) then { writer.addText(", ")inMode(code)}
+                    writer.addText(g.nameString)inMode(code)
+                    if (g != o.typeParams.params.last) then {writer.addComma}
                 }
             }
+
+            writer.addNewline
 
             def typeVis = graceDocVisitor.createFrom("{o.name.value}")outTo("{outdir}")as("type")
             o.accept(typeVis)
             typeVis.generate
+
             writer.addText(formatComments(o) rowClass "description" colspan 1)inMode(plain)
-            typesSection.addElement(n)withText(writer.dumpBin)
+
+            //Write out to the types section
+            section3.addElement(n)withText(writer.dumpBin)
             return false
 
         //Actual writing for types happens here
@@ -842,102 +1095,123 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
             writer.addText("Description")inMode(heading)
             writer.addText(formatComments(o) rowClass "top-box-description" colspan 1)inMode(plain)
             writer.addText("Properties")inMode(heading)
-            topDescSection.insert(writer.dumpBin)
+            section6.insert(writer.dumpBin)
             return true
         }
+
     }
 
-    //CLASS VISITOR -- MAIN INFO ABOUT CLASS?????
-    //Compiles and writes out the main information about a type
-    method visitMethod(o) -> Boolean {
+    // Visit some class methods -- on reg class pages
+    method visitMethod(o)up(anc) -> Boolean {
 
         if (settings.publicOnly && o.isConfidential) then { return false }
         if (o.isClass) then {
             return doClassMethod(o)
         }
-        var t := "### Definition \n"
-        var n := ""
+        writer.addBullet
         for (o.signature) do { part ->
-            t := t ++ part.name
-            n := ""
-            if (part != o.signature.last) then { n := n ++ "()" }
+            writer.addText(buildDefChain(anc) ++ part.name)inMode(code)
+            //if (part != o.signature.last) then { n := n ++ "()" }
             if (part.params.size > 0) then {
-                t := t ++ "( "
+                writer.addText(" ( ")inMode(code)
                 for (part.params) do { param ->
                     if (param.dtype != false) then {
-                        t := t ++ param.nameString
-
-                        t := t ++ " "
+                        writer.addText(param.nameString)inMode(code)
+                        writer.addColon
+                        writer.addSpace
                         if (param.dtype.kind == "identifier") then {
-                            t := t ++ getTypeLink(param.dtype.value)
+                            writer.addText(getTypeLink(param.dtype.value))inMode(plain)
                         } elseif (param.dtype.kind == "generic") then {
-                            t := t ++ getTypeLink(param.dtype.value.value)
-                            param.dtype.args.do { each -> t := "{t}{getTypeLink(each.value)}" } separatedBy { t := t ++ ", " }
+                            writer.addText(getTypeLink(param.dtype.value.value))inMode(plain)
+                            param.dtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(plain) } separatedBy { writer.addComma }
                         }
-                        t := t ++ " "
                         //t := t ++ ":<span class='parameter-type'>" ++ getTypeLink(param.dtype.value) ++ "</span>"
                     } else {
-                        t := t ++ param.nameString
+                       writer.addText(param.nameString)inMode(code)
                     }
                     if ((part.params.size > 1) && (param != part.params.last)) then {
-                        t := t ++ ", "
+                        writer.addComma
                     }
                 }
-                t := t ++ ")"
+                writer.addText(")")inMode(code)
             }
         }
-        t := t ++ "  "
+        writer.addSpace
+        writer.addText("->")inMode(code)
         if (o.dtype != false) then {
-            t := t ++ getTypeLink(o.dtype.value)
+            writer.addText(getTypeLink(o.dtype.value))inMode(plain)
         } else {
-            t := t ++ getTypeLink("Done")
+            writer.addText(getTypeLink("Done"))inMode(plain)
         }
-        t := t ++ "\n "
-        t := t ++ formatComments(o) rowClass "description" colspan 2
-        methodsSection.addElement(n)withText(t)
+        writer.addNewline
+        writer.addText(formatComments(o) rowClass "description" colspan 2)inMode(plain)
+       // section2.addElement(buildDefChain(anc) ++ n)withText(t)
+        //Insert the text into the page
+        section6.insert(writer.dumpBin)
         return false
     }
 
 
-    // individual class methods ????
-    method doClassMethod(m) -> Boolean {
+
+    method buildDefChain(anc) -> String {
+      var a := anc
+      var s := ""
+      while { a.isEmpty.not } do {
+          if ("defdec" == a.parent.kind) then {
+              s := (a.parent.nameString ++ "." ++ s)
+          }
+          elseif ("object" != a.parent.kind) then {
+              return s
+          }
+          a := a.forebears
+      }
+      return s
+    }
+
+    //METHOD INFO VISIOR -- called for each method
+    //WRITER REPLACEMENT COMPLETED ...
+    method doClassMethod(m)up(anc) -> Boolean {
         def o = m.body.last
 
+        //Called for main class page (for each method... )
         if (isOnClassPage == false) then {
-            var t := "<tr class='placeholder'>"
-            def n = m.nameString
-            t := t ++ "<td><code><span class='class-name'>{getClassLink(n)}</span>"
-            t := t ++ "."
+            def n = m.nameString //Needed to get class link...
+            def link = getClassLink(n) //show(part.name)
+            var ch := buildDefChain(anc)
+            if (ch != "") then {ch := "`" ++ ch; ch := ch ++ "`";} //Put it in quotes
+            def chain = "{ch}{link}"
+            writer.addBullet
+            if(chain != "") then {writer.addText("{chain}")inMode(plain)} //Add the ancestor methods if there..
+            if(!m.signature.isEmpty) then {writer.addText(":: ")inMode(code)}
             m.signature.do { part ->
-                t := t ++ "<span class='method-name'>{part.name}</span>"
                 if (part.params.size > 0) then {
-                    t := t ++ "("
+                    writer.addText(part.name)inMode(code)
+                    writer.addText("(")inMode(code)
                     for(part.params) do { param ->
                         if (param.dtype != false) then {
-                            t := t ++ "<span class='parameter-name'>" ++ param.value ++ "</span>"
-                            t := t ++ ":<span class='parameter-type'>" ++ getTypeLink(param.dtype.nameString) ++ "</span>"
+                            writer.addText(param.value)inMode(code)
+                            writer.addColon;
+                            writer.addText(getTypeLink(param.dtype.nameString))inMode(plain)
                         } else {
-                            t := t ++ "<span class='parameter-name'>" ++ param.value ++ "</span>"
+                            writer.addText(param.value)inMode(code)
                         }
                         if ((part.params.size > 1) && (param != part.params.last)) then {
-                            t := t ++ ", "
+                            writer.addComma
                         }
                     }
-                    t := t ++ ")"
+                    writer.addText(")")inMode(code)
                 }
             }
 
             if (m.dtype != false) then {
-                t := t ++ " -> "
+                writer.addText(" -> ")inMode(code)
                 if (m.dtype.kind == "identifier") then {
-                    t := t ++ getTypeLink(m.dtype.value)
+                    writer.addText(getTypeLink(m.dtype.value))inMode(plain)
                 } elseif (m.dtype.kind == "generic") then {
-                    t := t ++ getTypeLink(m.dtype.value.value) ++ "&lt;"
-                    m.dtype.args.do { each -> t := "{t}{getTypeLink(each.value)}" } separatedBy { t := t ++ ", " }
-                    t := t ++ "&gt;"
+                    writer.addText(getTypeLink(m.dtype.value.value))inMode(plain)
+                    m.dtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(plain) } separatedBy { writer.addComma }
                 }
             }
-            t := t ++ "</code></td></tr>"
 
             if(o.superclass != false) then {
                 o.superclass.accept(self)
@@ -946,126 +1220,144 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
             def classVis = graceDocVisitor.createFrom(n) outTo (outdir) as "class"
             o.accept(classVis)
             classVis.generate
-            t := t ++ formatComments(o) rowClass "top-box-description" colspan 1
-            classesSection.addElement(n) withText(t)
+            writer.addNewline
+            writer.addNewline
+            section6.insert(writer.dumpBin)
+            //section5.addElement(buildDefChain(anc) ++ n) withText(t)
             return false
+
+            //IF WE ARE ON A CLASS PAGE
           } else {
-            var t := "<span class='headline'><code><b>{o.name}</b>."
+            writer.addBullet
+            writer.addText(o.name)inMode(code)
 
             for(m.signature) do { part ->
-                t := t ++ "<b>{part.name}</b>"
+                writer.addText(part.name)inMode(code)
                 if (part.params.size > 0) then {
-                    t := t ++ "("
+                    writer.addText(" (")inMode(code)
                     for(part.params) do { param ->
                         if (param.dtype != false) then {
-                            t := t ++ param.value
-                            t := t ++ ":" ++ getTypeLink(param.dtype.value)
+                            writer.addText(param.value)inMode(code)
+                            writer.addColon
+                            writer.addText(getTypeLink(param.dtype.value))inMode(plain)
                         } else {
-                            t := t ++ param.value
+                            writer.addText(param.value)inMode(code)
+                            writer.addColon
                         }
                         if ((part.params.size > 1) && (param != part.params.at(part.params.size))) then {
-                            t := t ++ ", "
+                            writer.addComma
                         }
                     }
-                    t := t ++ ")"
                 }
+                writer.addText(")")inMode(code)
             }
 
             if (m.dtype != false) then {
-                t := t ++ " -> "
+                writer.addText(" -> ")inMode(code)
                 if (m.dtype.kind == "identifier") then {
-                    t := t ++ getTypeLink(m.dtype.value)
+                    writer.addText(getTypeLink(m.dtype.value))inMode(plain)
                 } elseif (m.dtype.kind == "generic") then {
-                    t := t ++ getTypeLink(m.dtype.value.value) ++ "&lt;"
-                    m.dtype.args.do { each -> t := "{t}{getTypeLink(each.value)}" } separatedBy { t := t ++ ", " }
-                    t := t ++ "&gt;"
+                    writer.addText(getTypeLink(m.dtype.value.value))inMode(plain)
+                    m.dtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(plain)} separatedBy { writer.addComma }
                 }
             }
 
-            t := t ++ "</code></span><hr />"
-            t := t ++ formatComments(o) rowClass "top-box-description" colspan 1
-            topDescSection.insert(t)
+            writer.addNewline
+            writer.addText(formatComments(o) rowClass "top-box-description" colspan 1)inMode(plain)
+            section6.insert(writer.dumpBin)
             return true
         }
     }
 
-    method visitDefDec(o) -> Boolean {
+    //Visits definitions
+    method visitDefDec(o)up(anc) -> Boolean {
         if (isOnClassPage == true) then {
             if (!settings.publicOnly) then {
                 def n = o.name.value
-                var t := "<tr class='placeholder'><td><code>def</code></td><td class='identifier-name'>{o.name.value}"
-                t := t ++ "</td><td><code>"
+                var temp := buildDefChain(anc) ++ n
+                writer.addBullet
+                if(temp != "")then{writer.addText(buildDefChain(anc) ++ n)inMode(code)}
+                writer.addText(" -> ")inMode(code)
                 if (o.dtype != false) then {
                     if (o.dtype.kind == "identifier") then {
-                        t := t ++ getTypeLink(o.dtype.value)
+                        writer.addText(getTypeLink(o.dtype.value))inMode(plain)
                     } elseif (o.dtype.kind == "generic") then {
-                        t := t ++ getTypeLink(o.dtype.value.value) ++ "&lt;"
-                        o.dtype.args.do { each -> t := "{t}{getTypeLink(each.value)}" } separatedBy { t := t ++ ", " }
-                        t := t ++ "&gt;"
+                        writer.addText(getTypeLink(o.dtype.value.value))inMode(plain)
+                        o.dtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(plain) } separatedBy { writer.addComma }
                     }
                 }
-                t := t ++ "</code></td></tr>"
-                t := t ++ formatComments(o) rowClass "description" colspan 3
-                fieldsSection.addElement(n) withText(t)
+                writer.addNewline
+
+                writer.addText(formatComments(o) rowClass "description" colspan 3)inMode(plain)
+                section4.insert(writer.dumpBin)
 
             } else {
                 //in publicOnly mode, readable defs should show up as getter methods
                 if (o.isReadable) then {
                     //FIXME: if isOnTypePage, then ???
                     def n = o.name.value
-                    var t := "<tr class='placeholder'><td class='identifier-name'>{o.name.value}"
-                    t := t ++ "</td><td><code>"
+                    var temp := buildDefChain(anc) ++ n
+                    writer.addBullet
+                    writer.addText("def ")inMode(code)
+
+                    if(temp != "")then{writer.addText(buildDefChain(anc) ++ n)inMode(code)}
+                    writer.addText(" -> ")inMode(code)
+
                     if (o.dtype != false) then {
                         if (o.dtype.kind == "identifier") then {
-                            t := t ++ getTypeLink(o.dtype.value)
+                            writer.addText(getTypeLink(o.dtype.value))inMode(plain)
                         } elseif (o.dtype.kind == "generic") then {
-                            t := t ++ getTypeLink(o.dtype.value.value) ++ "&lt;"
-                            o.dtype.args.do { each -> t := "{t}{getTypeLink(each.value)}" } separatedBy { t := t ++ ", " }
-                            t := t ++ "&gt;"
+                            writer.addText(getTypeLink(o.dtype.value.value))inMode(plain)
+                            o.dtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(plain) } separatedBy { writer.addComma }
                         }
                     }
-                    t := t ++ "</code></td></tr>"
-                    t := t ++ formatComments(o) rowClass "description" colspan 2
-                    methodsSection.addElement(n)withText(t)
+                    writer.addNewline
+
+                    writer.addText(formatComments(o) rowClass "description" colspan 2)inMode(plain)
+                    section4.insert(writer.dumpBin)
+
                 }
             }
             return false
         } else {
             if (!settings.publicOnly) then {
-                def n = o.name.value
-                var t := "<tr class='placeholder'><td><code>def</code></td><td class='identifier-name'>{o.name.value}"
-                t := t ++ "</td><td><code>"
+                def n = buildDefChain(anc) ++ o.name.value
+                writer.addBullet
+                writer.addText("def {n}")inMode(code)
+                writer.addText(" -> ")inMode(code)
+
                 if (o.dtype != false) then {
                     if (o.dtype.kind == "identifier") then {
-                        t := t ++ getTypeLink(o.dtype.value)
+                        writer.addText(getTypeLink(o.dtype.value))inMode(plain)
                     } elseif (o.dtype.kind == "generic") then {
-                        t := t ++ getTypeLink(o.dtype.value.value) ++ "&lt;"
-                        o.dtype.args.do { each -> t := "{t}{each.value}" } separatedBy { t := t ++ ", " }
-                        t := t ++ "&gt;"
+                        writer.addText(getTypeLink(o.dtype.value.value))inMode(plain)
+                        o.dtype.args.do { each -> writer.addText("{each.value}")inMode(code) } separatedBy { writer.addComma }
                     }
                 }
-                t := t ++ "</code></td></tr>"
-                t := t ++ formatComments(o) rowClass "description" colspan 3
-                fieldsSection.addElement(n)withText(t)
+                writer.addNewline
+                writer.addText(formatComments(o) rowClass "description" colspan 3)inMode(plain)
+                section4.insert(writer.dumpBin)
 
             } else {
                 //in publicOnly mode, readable defs should show up as getter methods
                 if (o.isReadable) then {
-                    var t := "<tr class='placeholder'><td class='identifier-name'>{o.name.value}"
+                    writer.addBullet
+                    writer.addText("def ")inMode(code)
+                    writer.addText("{buildDefChain(anc) ++ o.name.value}")inMode(code)
+                    writer.addText(" -> ")inMode(code)
                     def n = o.name.value
-                    t := t ++ "</td><td><code>"
                     if (o.dtype != false) then {
                         if (o.dtype.kind == "identifier") then {
-                            t := t ++ getTypeLink(o.dtype.value)
+                            writer.addText(getTypeLink(o.dtype.value))inMode(plain)
                         } elseif (o.dtype.kind == "generic") then {
-                            t := t ++ getTypeLink(o.dtype.value.value) ++ "&lt;"
-                            o.dtype.args.do { each -> t := "{t}{getTypeLink(each.value)}" } separatedBy { t := t ++ ", " }
-                            t := t ++ "&gt;"
+                            writer.addText(getTypeLink(o.dtype.value.value))inMode(plain)
+                            o.dtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(plain) } separatedBy { writer.addComma }
                         }
                     }
-                    t := t ++ "</code></td></tr>"
-                    t := t ++ formatComments(o) rowClass "description" colspan 2
-                    methodsSection.addElement(n)withText(t)
+                    writer.addNewline
+
+                    writer.addText(formatComments(o) rowClass "description" colspan 2)inMode(plain)
+                    section4.insert(writer.dumpBin)
                 }
             }
             return false
@@ -1076,65 +1368,81 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         def n = o.nameString
         if (isOnClassPage == true) then {
             if (!settings.publicOnly) then {
-                var t := "<tr class='placeholder'><td><code>var</code></td><td class='identifier-name'>{o.name.value}"
-                t := t ++ "</td><td><code>"
+                writer.addBullet
+                writer.addText("var ")inMode(code)
+                writer.addText("{buildDefChain(anc)}{o.name.value}")inMode(code)
                 if (o.dtype != false) then {
-                    t := t ++ "{getTypeLink(o.dtype.value)}"
+                    writer.addText(" -> ")inMode(code)
+                    writer.addText("{getTypeLink(o.dtype.value)}")inMode(plain)
                 }
-                t := t ++ "</code></td></tr>"
-                t := t ++ formatComments(o) rowClass "description" colspan 3
-                fieldsSection.addElement(n)withText(t)
+                writer.addNewline
+                writer.addText(formatComments(o) rowClass "description" colspan 3)inMode(plain)
+                section4.insert(writer.dumpBin)
             } else {
                 if (o.isReadable) then {
-                    var t := "<tr class='placeholder'><td class='identifier-name'>{o.name.value}"
-                    t := t ++ "</td><td>"
+                    writer.addBullet
+                    writer.addText("var ")inMode(code)
+                    writer.addText("{buildDefChain(anc)}{o.name.value}")inMode(code)
                     if (o.dtype != false) then {
-                        t := t ++ "{getTypeLink(o.dtype.value)}"
+                         writer.addText(" -> ")inMode(code)
+                         writer.addText("{getTypeLink(o.dtype.value)}")inMode(plain)
                     }
-                    t := t ++ "</code></td></tr>"
-                    t := t ++ formatComments(o) rowClass "description" colspan 2
-                    methodsSection.addElement(n)withText(t)
+                    writer.addText(formatComments(o) rowClass "description" colspan 2)inMode(plain)
+                    section4.insert(writer.dumpBin)
                 }
                 if (o.isWritable) then {
-                    var t := "<tr class='placeholder'><td><code><span class='method-name'>{o.name.value}:=</span>"
+                    writer.addBullet
+                    writer.addText("var ")inMode(code)
+                    writer.addText("{buildDefChain(anc)}{o.name.value}")inMode(code)
                     if (o.dtype != false) then {
-                        t := t ++ "(_:{getTypeLink(o.dtype.value)})"
+                        writer.addText(" -> ")inMode(code)
+                        writer.addText("(_:{getTypeLink(o.dtype.value)})")inMode(plain)
+                    }else{
+                        writer.addText("-> Done")inMode(code)
                     }
-                    t := t ++ "</code></td><td><code>Done</code></td></tr>"
-                    t := t ++ "<tr class='description'><td colspan='2'>Updates {n}</td></tr>"
-                    methodsSection.addElement(n++":=")withText(t)
+                    writer.addText("Updates {n}")inMode(code)
+                    section4.insert(writer.dumpBin)
                 }
             }
             return false
         } else {
             if (!settings.publicOnly) then {
-                var t := "<tr class='placeholder'><td><code>var</code></td><td class='identifier-name'>{o.name.value}"
-                t := t ++ "</td><td><code>"
+                writer.addBullet
+                writer.addText("var ")inMode(code)
+                writer.addText("{buildDefChain(anc)}{o.name.value}")inMode(code)
                 if (o.dtype != false) then {
-                    t := t ++ "{getTypeLink(o.dtype.value)}"
+                     writer.addText(" -> ")inMode(code)
+                     writer.addText("{getTypeLink(o.dtype.value)}")inMode(plain)
                 }
-                t := t ++ "</code></td></tr>"
-                t := t ++ formatComments(o) rowClass "description" colspan 3
-                fieldsSection.addElement(n)withText(t)
+                writer.addNewline
+                writer.addText(formatComments(o) rowClass "description" colspan 3)inMode(plain)
+                section4.insert(writer.dumpBin)
             } else {
                 if (o.isReadable) then {
-                    var t := "<tr class='placeholder'><td class='identifier-name'>{o.name.value}"
-                    t := t ++ "</td><td><code>"
+                    writer.addBullet
+                    writer.addText("var ")inMode(code)
+                    writer.addText("{buildDefChain(anc)}{o.name.value}")inMode(code)
                     if (o.dtype != false) then {
-                        t := t ++ "{getTypeLink(o.dtype.value)}"
+                         writer.addText(" -> ")inMode(code)
+                         writer.addText("{getTypeLink(o.dtype.value)}")inMode(plain)
                     }
-                    t := t ++ "</code></td></tr>"
-                    t := t ++ formatComments(o) rowClass "description" colspan 2
-                    methodsSection.addElement(n)withText(t)
-                }
+                    writer.addNewline
+                    writer.addText(formatComments(o) rowClass "description" colspan 2)inMode(plain)
+                    section4.insert(writer.dumpBin)
+            }
                 if (o.isWritable) then {
-                    var t := "<tr class='placeholder'><td><code><span class='method-name'>{n}:=</span>"
+                    writer.addBullet
+                    writer.addText("var ")inMode(code)
+                    writer.addText("{buildDefChain(anc)}{o.name.value}")inMode(code)
                     if (o.dtype != false) then {
-                        t := t ++ "(_:{getTypeLink(o.dtype.value)})"
+                       writer.addText(" -> ")inMode(code)
+                       writer.addText("(_:{getTypeLink(o.dtype.value)})")inMode(plain)
                     }
-                    t := t ++ "</code></td><td><code>Done</code></td></tr>"
-                    t := t ++ "<tr class='description'><td colspan='2'>Updates {n}</td></tr>"
-                    methodsSection.addElement "{n}:=" withText(t)
+                    else{
+                       writer.addText("-> Done")inMode(code)
+                    }
+                    writer.addText("Updates {n}")inMode(code)
+                    section4.insert(writer.dumpBin)
                 }
             }
             return false
@@ -1155,7 +1463,6 @@ method formatComments(astNode) rowClass (rowClassName) colspan (n) -> String {
     var t := ""
     if (false != astNode.comments) then {
         t := t ++ astNode.comments.value ++ "\n"
-        t := t ++ "\n"
     }
     return t
 }
@@ -1171,6 +1478,7 @@ var counter
 var allModules := io.listdir(settings.inputdir)
 var parsedFiles := dictionary []
 var inputWasFound := false
+var sidebarGen := sidebarFileGenerator
 
 //LEX AND PARSE ALL INPUT FILES
 counter := 1
@@ -1215,6 +1523,7 @@ for (allModules) do { filename ->
 
 //GENERATE ACTUAL HTML PAGES
 counter := 1
+//Note: Only generares with modules...
 for (allModules) do { filename ->
     if (filename.endsWith(".grace")) then {
         if (settings.verbosity > 0) then { print "On {filename} - generating GraceDocs... ({sys.elapsedTime})" }
@@ -1223,11 +1532,14 @@ for (allModules) do { filename ->
         gdv := graceDocVisitor.createFrom(filename) outTo (modulename) as "module"
         moduleObject.accept(gdv)
         gdv.generate
-        gdv.buildindex
-        gdv.buildcss
-        gdv.buildjs
+        //gdv.buildindex  -- No Longer needed for markdown...
+        //gdv.buildcss
+        //gdv.buildjs
         gdv.build404
+        gdv.setSidebarName //Set the module of the sidebar for navigation
+        sidebarGen.generate(modulename)
         if (settings.verbosity > 0) then { print "On {filename} - done! ({sys.elapsedTime})" }
+        if (settings.verbosity > 0) then { print "\n\nSidebar generated:{modulename} at ({sys.elapsedTime})" }
         counter := counter + 1
     }
 }

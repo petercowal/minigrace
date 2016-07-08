@@ -896,7 +896,8 @@ iframe {
                     } elseif (node.left.kind == "identifier") then {
                         temp := "{getTypeLink(node.left.value)} {ops.pop}"
                     } elseif (node.left.kind == "member") then {
-                        temp := getTypeLink("{node.left.receiver.value}.{node.left.value}") ++ " {ops.pop}"
+
+                        temp := getTypeLink("{node.left.in.value}.{node.left.value}") ++ " {ops.pop}"
                     } elseif (node.right.kind == "member") then {
                         tps.push("{node.left.receiver.value}.{node.left.value}")
                     }
@@ -925,7 +926,7 @@ iframe {
                     t := t ++ "&gt;"
                 }
             } elseif (node.kind == "member") then {
-                t := t ++ getTypeLink("{node.receiver.value}.{node.value}")
+                t := t ++ getTypeLink("{node.in.value}.{node.value}")
                 if (node.generics != false) then {
                     t := t ++ "&lt;"
                     for (node.generics) do { g->
