@@ -220,6 +220,32 @@ class newScopeIn(parent') kind(variety') {
     method isMethodScope {
         variety == "method"
     }
+    method canonicalName(name) {
+        var rtMe := ""
+        var i := 1;
+        while {i <= name.size} do {
+            if (name.at(i) == "(") then {
+                rtMe := rtMe ++ "("
+                i := i + 1
+                var nParams := ""
+                while {name.at(i) != ")"} do {
+                    nParams := nParams ++ name.at(i);
+                    i := i + 1
+                }
+                var j := 1
+                while {j < nParams.asNumber} do { 
+                    rtMe := rtMe ++ "_,"
+                    j := j + 1
+                }
+                rtMe := rtMe ++ "_)"
+                i := i + 1;
+            } else {
+                rtMe := rtMe ++ name.at(i)
+                i := i + 1
+            }
+        }
+        rtMe;
+    }
     method resolveOuterMethod(name) fromNode (aNode) {
         // replace name by outer.outer. ... .name,
         // depending on where name is declared.
@@ -239,7 +265,7 @@ class newScopeIn(parent') kind(variety') {
                 mem := ast.memberNode.new("outer", mem) scope(self)
             }
         }
-        errormessages.syntaxError "no method {name}"
+        errormessages.syntaxError "no method {canonicalName(name)}"
                 atRange(aNode.line, aNode.linePos, aNode.linePos + name.size - 1)
     }
     method scopeReferencedBy(nd:ast.AstNode) {
@@ -258,7 +284,7 @@ class newScopeIn(parent') kind(variety') {
                     return s.getScope(sought)
                 }
             }
-            errormessages.syntaxError "no method {sought}"
+            errormessages.syntaxError "no method {canonicalName(sought)}"
                 atRange(nd.line, nd.linePos, nd.linePos + sought.size - 1)
         } elseif {nd.kind == "op"} then {
             def receiverScope = self.scopeReferencedBy(nd.left)
