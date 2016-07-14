@@ -158,6 +158,41 @@ Object alloc_MirrorMethod(Method *method, Object obj) {
     return o;
 }
 
+char* canonicalName(const char *nname) {
+    int length;
+    for (int i = 0; i < strlen(nname); i++) {
+        if (nname[i] == '(') {
+            int nParams = atoi(nname + i + 1);
+            length += nParams * 2 - 1;
+            while (nname[++i] >= '0' && nname[i] <= '9') {
+                
+            }
+        }
+        length++;
+    }
+    char *rtMe = malloc(sizeof(char) * (length + 1));
+    int j;
+    for (int i = 0; i < strlen(nname); i++) {
+        if (nname[i] == '(') {
+            rtMe[j] = '(';
+            j++;
+            int nParams = atoi(nname + i + 1);
+            for (int k = 0; k < nParams - 1; k++) {
+                rtMe[j] = '_';
+                rtMe[j + 1] = ',';
+                j += 2;
+            }
+            rtMe[j] = '_';
+            j++;
+            while (nname[++i] >= '0' && nname[i] <= '9') {
+            }
+        }
+        rtMe[j] = nname[i];
+        j++;
+    }
+    return rtMe;
+}
+
 Object Mirror_getMethod(Object self, int nparams, int *argcv, Object *argv,
         int flags) {
     struct MirrorObject *s = (struct MirrorObject*)self;
@@ -165,7 +200,7 @@ Object Mirror_getMethod(Object self, int nparams, int *argcv, Object *argv,
     Method *m = findmethodsimple(o, grcstring(argv[0]));
     if (m == NULL) {
         graceRaise(NoSuchMethod(), "method '%s' not found by mirror\n",
-                        grcstring(argv[0]));
+                        canonicalName(grcstring(argv[0])));
     }
     return alloc_MirrorMethod(m, o);
 }

@@ -3138,6 +3138,32 @@ function callmethodChecked(obj, methname, argcv) {
     return ret;
 }
 
+function canonicalName(name) {
+    var cName = "";
+    var end = name.length;
+    var i = 0;
+    while (i < end) {
+        if (name.charAt(i) == '(') {
+            cName += "(";
+            i++;
+            var params = "";
+            while (name.charAt(i) != ')') {
+                params += name.charAt(i);
+                i++;
+            }
+            var nParams = parseInt(params, 10);
+            for (var j = 1; j < nParams; j++) {
+                cName += "_,";
+            }
+            cName += "_)"
+            i++;
+        }
+        cName += name.charAt(i);
+        i++;
+    }
+    return cName;
+}
+
 function raiseNoSuchMethod(name, target) {
     var targetDesc = "";
     if (target.definitionLine && target.definitionModule !== "unknown") {
@@ -3147,20 +3173,20 @@ function raiseNoSuchMethod(name, target) {
         targetDesc = " in " + target.definitionModule + " module";
     }
     throw new GraceExceptionPacket(NoSuchMethodErrorObject,
-            new GraceString("no method '" + name + "' on " +
+            new GraceString("no method '" + canonicalName(name) + "' on " +
                 describe(target) + "."));
 }
 
 function raiseConfidentialMethod(name, target) {
     throw new GraceExceptionPacket(NoSuchMethodErrorObject,
-            new GraceString("requested confidential method '" + name +
+            new GraceString("requested confidential method '" + canonicalName(name) +
                 "' of " + describe(target) + " from outside."));
 }
 
 function raiseUninitializedVariable(name, target) {
     throw new GraceExceptionPacket(UninitializedVariableObject,
            new GraceString("uninitialised variable used as argument to '" +
-                           name + "' of " + describe(target) + "."));
+                           canonicalName(name) + "' of " + describe(target) + "."));
 }
 
 function describe(obj) {

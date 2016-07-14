@@ -470,12 +470,10 @@ char* canonicalName(const char *nname) {
             int nParams = atoi(nname + i + 1);
             length += nParams * 2 - 1;
             while (nname[++i] >= '0' && nname[i] <= '9') {
-                
             }
         }
         length++;
     }
-    
     char *rtMe = glmalloc(sizeof(char) * (length + 1));
     int j;
     for (int i = 0; i < strlen(nname); i++) {
@@ -491,9 +489,7 @@ char* canonicalName(const char *nname) {
             rtMe[j] = '_';
             j++;
             while (nname[++i] >= '0' && nname[i] <= '9') {
-                
             }
-            
         }
         rtMe[j] = nname[i];
         j++;
