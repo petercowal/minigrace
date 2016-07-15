@@ -190,7 +190,7 @@ class sidebarModule{
 //Class to generate sidebar file...
 class sidebarFileGenerator
 {
-     var fileOut:String := "entries:\n- title: Sidebar\n  product: Grace Documentation\n  version: 1.0\n  folders:\n\n"
+     var fileOut:String := "entries:\n- title: Sidebar\n  product: Documentation\n  version: 1.0\n  folders:\n\n"
      var folderIndent := 2
      var fileIndent := 4
      var classFiles:String := ""
@@ -198,7 +198,7 @@ class sidebarFileGenerator
      var modSet := false
      var inSubFolder := true
      var contentExistsInFolder := false
-     var moduleList: dictionary<sidebarModule> := dictionary []
+     var moduleList: Dictionary<sidebarModule> := dictionary []
 
 
      //Add to a specific list output
@@ -216,7 +216,6 @@ class sidebarFileGenerator
 
                //Store the module in the dictionary
                moduleList.at(modName)put(mod)
-               //print "\n\nADDED MOD: {mod.name} onbar: {modName}\n"
           }
 
           if(aList == classList) then
@@ -313,29 +312,24 @@ class sidebarFileGenerator
 
      method generate(module:String)
      {
-          print "\nGenerating Sidebar... "
+          if (settings.verbosity > 0) then { print "Generating Sidebar... ({sys.elapsedTime})" }
           if(!modSet) then { setModule("Main-1")}; //Just in case setModule was not already called,
                                              // which it should have been
 
           var mod:sidebarModule := moduleList.at(module)
 
-          //print "\n\nSidebar MOD NAME: {mod.name} onbar: {module}\n"
-
           //Generate Sub-Folders and then add Files
           addSubFolder("Classes")
           fileOut := fileOut ++ mod.classFiles
-          //fileOut := fileOut ++ classFiles
 
           addSubFolder("Types")
           fileOut := fileOut ++ mod.typeFiles
-          //fileOut := fileOut ++ typeFiles
 
           var out := io.open("{settings.outputdir}/grace-doc-sidebar.yml", "w")
           out.write(fileOut)
           out.close
      }
 }
-
 
 //Class for a markdown writer object
 class markdownWriter
@@ -373,7 +367,6 @@ class markdownWriter
           //Add it to the set
           propSet.add(newProp);
 
-          print "added prop"
      }
 ////////////////////////////////////////////////////////
 
@@ -661,7 +654,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         } elseif (io.exists("{settings.outputdir}/gracelib/types/{filename}.md")) then {
             out := out ++ "{baseUrl}{filename}"
         } else {
-            out := out ++ "{baseUrl}404"
+            out := out ++ "\{\{site.baseurl}}/404" //Might want to append real base-url here too
             //print "\nFile NOT FOUND!! --> below"
         }
         //print "\nBaseURL: {baseUrl}\n FileName: {filename}.md"
@@ -682,7 +675,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
       } elseif (io.exists("{settings.outputdir}/gracelib/classes/{filename}.md")) then {
           out := out ++ "{baseUrl}{filename}"
       } else {
-          out := out ++ "{baseUrl}404"
+          out := out ++ "\{\{site.baseurl}}404" //Might want to append real base-url here too
           //print "\nFile NOT FOUND!! --> below"
       }
       //print "\nBaseURL: {baseUrl}\n FileName: {filename}.md"
@@ -760,7 +753,6 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         if(title.contains("Class:"))then
         {
              sidebarGen.addFile(title)withLink(permalink)toList(classList)inModule(outdir)
-             print "\nadded {title} to {classList} in module {outdir}"
         }
         elseif(title.contains("Type:"))then
         {
@@ -943,23 +935,28 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
             writer.addBullet
             for (o.signature) do { part ->
                 writer.addText(part.name)inMode(code)
+                writer.addSpace
                 if (part.params.size > 0) then {
                     writer.addText("(")inMode(code)
                     for (part.params) do { param ->
                         if (param.dtype != false) then {
                             writer.addText(param.nameString)inMode(code)
                             writer.addColon
+                            writer.addSpace
                             if (param.dtype.kind == "identifier") then {
                                 writer.addText(getTypeLink(param.dtype.value))inMode(plain)
+                                //writer.addSpace
                             } elseif (param.dtype.kind == "generic") then {
-                                writer.addText(param.dtype.value.value)inMode(plain)
-                                param.dtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(code)} separatedBy { writer.addComma }
+                                writer.addText(param.dtype.value.value)inMode(code)
+                                writer.addSpace
+                                param.dtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(plain)} separatedBy { writer.addText(",")inMode(code) }
                             }
                         } else {
                             writer.addText(param.nameString)inMode(code)
+                            writer.addSpace
                         }
                         if ((part.params.size > 1) && (param != part.params.last)) then {
-                            writer.addComma
+                            writer.addText(",")inMode(code)
                         }
                     }
                     writer.addText(")")inMode(code)
@@ -974,7 +971,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                     writer.addText(getTypeLink(o.rtype.value))inMode(plain)
                 } elseif (o.rtype.kind == "generic") then {
                     writer.addText(getTypeLink(o.rtype.value.value))inMode(plain)
-                    o.rtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(code) } separatedBy { writer.addComma}
+                    o.rtype.args.do { each -> writer.addText("{getTypeLink(each.value)}")inMode(plain) } separatedBy { writer.addComma}
                 }
             } else {
                 writer.addText("Done")inMode(code)
@@ -1025,7 +1022,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         //Actual writing for types happens here
         } else {
             writer.addText("Definition")inMode(heading)
-            writer.addText("{o.name.value} ->")inMode(code)
+            writer.addText("{o.name.value} -> ")inMode(code)
             if (false != o.typeParams) then {
                 for (o.typeParams.params) do { g->
                     writer.addText(g.nameString)inMode(code)
@@ -1061,14 +1058,14 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
 
                 while {(tps.size > 0) && (ops.size > 0)} do {
                     def p = tps.pop
-                    temp := "{temp} {ops.pop} {getTypeLink(p.value)}"
+                    temp := "`{temp} {ops.pop}` {getTypeLink(p.value)}"
                 }
                 if (ops.size > 0) then {
-                    temp := "{temp} {ops.pop}"
+                    temp := "`{temp} {ops.pop}`"
                 }
 
-                temp := temp ++ "type"
-                writer.addText(temp)inMode(code)
+                temp := temp ++ "`type`"
+                writer.addText(temp)inMode(plain)
                 writer.addText("\{...added methods below...\}")inMode(code)
             } elseif (node.kind == "typeliteral") then {
 
@@ -1137,7 +1134,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
             }
         }
         writer.addSpace
-        writer.addText("->")inMode(code)
+        writer.addText("-> ")inMode(code)
         if (o.dtype != false) then {
             writer.addText(getTypeLink(o.dtype.value))inMode(plain)
         } else {
@@ -1190,7 +1187,8 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                     for(part.params) do { param ->
                         if (param.dtype != false) then {
                             writer.addText(param.value)inMode(code)
-                            writer.addColon;
+                            writer.addColon
+                            writer.addSpace
                             writer.addText(getTypeLink(param.dtype.nameString))inMode(plain)
                         } else {
                             writer.addText(param.value)inMode(code)
@@ -1239,6 +1237,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                         if (param.dtype != false) then {
                             writer.addText(param.value)inMode(code)
                             writer.addColon
+                            writer.addSpace
                             writer.addText(getTypeLink(param.dtype.value))inMode(plain)
                         } else {
                             writer.addText(param.value)inMode(code)
@@ -1539,7 +1538,7 @@ for (allModules) do { filename ->
         gdv.setSidebarName //Set the module of the sidebar for navigation
         sidebarGen.generate(modulename)
         if (settings.verbosity > 0) then { print "On {filename} - done! ({sys.elapsedTime})" }
-        if (settings.verbosity > 0) then { print "\n\nSidebar generated:{modulename} at ({sys.elapsedTime})" }
+        if (settings.verbosity > 0) then { print "Sidebar generated:{modulename} at ({sys.elapsedTime})" }
         counter := counter + 1
     }
 }
