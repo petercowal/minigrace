@@ -124,8 +124,10 @@ checkgenjs: l1/minigrace
         then l1/minigrace --dir js --target js --verbose ast.grace ; fi
 	jsl -nologo -conf tools/jsl.genjs.conf -process js/ast.js
 
+
 collectionsPrelude.gct: collectionsPrelude.grace l1/minigrace
-	cd l1 && GRACE_MODULE_PATH=. ./minigrace $(VERBOSITY) --make --noexec -XNoMain --dir .. --gracelib .. ../$<
+	l1/minigrace $(VERBOSITY) --make --noexec -XNoMain $<
+
 
 collectionsPrelude.gcn: collectionsPrelude.gct
 
@@ -374,8 +376,10 @@ $(OBJECTDRAW_REAL:%.grace=modules/%.grace): modules/%.grace: pull-objectdraw
 oldWeb: $(WEBFILES) js/sample
 	rsync -a -l -z --delete $(WEBFILES) $(WEB_SERVER):$(WEB_DIRECTORY)
 	rsync -a -l -z js/samples.js $(WEB_SERVER):$(WEB_DIRECTORY)
+	rsync -a -l -z --delete js/sample $(WEB_SERVER):$(WEB_DIRECTORY)
 	rsync -a -l -z js/sample $(WEB_SERVER):$(WEB_DIRECTORY)
 	rsync -a -l -z sample $(WEB_SERVER):$(WEB_DIRECTORY)
+	
 
 pull-web-editor:
 	@if [ -e grace-web-editor ] ; \
