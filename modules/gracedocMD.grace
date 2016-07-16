@@ -125,7 +125,6 @@ class section.withTemplate(md')andCursorAt(idx) -> Section {
     }
 }
 
-
 //Class for other sections without a template
 class emptySection.withCursorAt(idx) -> Section {
     var md:String is readable := ""
@@ -459,7 +458,6 @@ class markdownWriter
 }
 
 
-
 method trim(c:String) -> String {
     var start := 1
     var end := c.size
@@ -661,7 +659,6 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         out := out ++ ")"
         return out
     }
-
     method getClassLink(c:String)show(rep:String){
       def filename = "{c}"
       var out := "[`{c}`]("
@@ -682,44 +679,8 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
       out := out ++ ")"
       return out
     }
-
     method getClassLink(c:String) is confidential {
-        def filename = "{c}.md"
-        var out := "[`{c}`]("
-        //first, check current module's class directory for filename
-        if (io.exists("{settings.outputdir}/{outdir}/classes/{filename}")) then {
-            if (isOnClassPage) then {
-                out := out ++ "{filename}"
-            } elseif (isOnTypePage) then {
-                out := out ++ "../classes/{filename}"
-            } else {
-                out := out ++ "classes/{filename}"
-            }
-        //if not found, check imported module directories
-        } elseif (io.exists("{settings.outputdir}/imported/classes/{filename}")) then {
-            if (isOnTypePage || isOnClassPage) then {
-                out := out ++ "../../imported/classes/{filename}"
-            } else {
-                out := out ++ "../imported/classes/{filename}"
-            }
-        //if not found, check gracelib classes
-        } elseif (io.exists("{settings.outputdir}/gracelib/classes/{filename}")) then {
-            if (isOnTypePage || isOnClassPage) then {
-                out := out ++ "../../gracelib/classes/{filename}"
-            } else {
-                out := out ++ "../gracelib/classes/{filename}"
-            }
-        } else {
-            var dots := ""
-            if (isOnClassPage || isOnTypePage) then {
-                dots := "../../"
-            } else {
-                dots := "../"
-            }
-            out := out ++ "{dots}404.md"
-        }
-        out := out ++ ")"
-        return out
+        getClassLink(c)show(c)
     }
 
     method buildTemplate is confidential {
@@ -1098,12 +1059,13 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
 
     }
 
+
     // Visit some class methods -- on reg class pages
     method visitMethod(o)up(anc) -> Boolean {
 
         if (settings.publicOnly && o.isConfidential) then { return false }
         if (o.isClass) then {
-            return doClassMethod(o)
+            return doClassMethod(o)up(anc)
         }
         writer.addBullet
         for (o.signature) do { part ->
@@ -1147,7 +1109,6 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
         section6.insert(writer.dumpBin)
         return false
     }
-
 
 
     method buildDefChain(anc) -> String {
@@ -1218,6 +1179,7 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
             def classVis = graceDocVisitor.createFrom(n) outTo (outdir) as "class"
             o.accept(classVis)
             classVis.generate
+
             writer.addNewline
             writer.addNewline
             section6.insert(writer.dumpBin)
@@ -1314,10 +1276,9 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
 
                     writer.addText(formatComments(o) rowClass "description" colspan 2)inMode(plain)
                     section4.insert(writer.dumpBin)
-
                 }
             }
-            return false
+            return anc.parent.isObject
         } else {
             if (!settings.publicOnly) then {
                 def n = buildDefChain(anc) ++ o.name.value
@@ -1359,12 +1320,12 @@ class graceDocVisitor.createFrom(in) outTo (dir) as (pageType) {
                     section4.insert(writer.dumpBin)
                 }
             }
-            return false
+            return anc.parent.isObject
         }
     }
 
-    method visitVarDec(o) -> Boolean {
-        def n = o.nameString
+    method visitVarDec(o)up(anc) -> Boolean {
+        def n = buildDefChain(anc) ++ o.nameString
         if (isOnClassPage == true) then {
             if (!settings.publicOnly) then {
                 writer.addBullet
