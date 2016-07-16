@@ -119,9 +119,10 @@ function startup() {
   // resize ace on window resize
   window.onresize = function(event) {
 
+
       document.getElementById('code_txt_real').style.height = (document.getElementById('stdout_txt').clientHeight
                                                                   + document.getElementById('tabbox').clientHeight) + 'px';
-                                                                  
+
       document.getElementById('code_txt_real').style.width = (document.getElementById('stdout_txt').clientWidth - 30) + 'px';
   }
 
