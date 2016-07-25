@@ -239,7 +239,7 @@ class newScopeIn(parent') kind(variety') {
                 mem := ast.memberNode.new("outer", mem) scope(self)
             }
         }
-        errormessages.syntaxError "no method {name}"
+        errormessages.syntaxError "no method {aNode.canonicalName}"
                 atRange(aNode.line, aNode.linePos, aNode.linePos + name.size - 1)
     }
     method scopeReferencedBy(nd:ast.AstNode) {
@@ -258,7 +258,7 @@ class newScopeIn(parent') kind(variety') {
                     return s.getScope(sought)
                 }
             }
-            errormessages.syntaxError "no method {sought}"
+            errormessages.syntaxError "no method {nd.canonicalName}"
                 atRange(nd.line, nd.linePos, nd.linePos + sought.size - 1)
         } elseif {nd.kind == "op"} then {
             def receiverScope = self.scopeReferencedBy(nd.left)
