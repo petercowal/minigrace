@@ -168,6 +168,9 @@ method initialise {
     initialised := true
     trig := dom.window.Math
     canvas := document.getElementById("graphics")
+    if (dom.noObject == canvas) then {
+        canvas := document.getElementById("standard-canvas")
+    }
     ctx := canvas.getContext("2d")
     ctx.lineWidth := 1
     ctx.fillStyle := "white"
